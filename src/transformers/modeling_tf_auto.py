@@ -272,7 +272,7 @@ TF_MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING = OrderedDict(
     [
         # Model for Seq2Seq Causal LM mapping
         (T5Config, TFT5ForConditionalGeneration),
-        (BartConfig, TFBartForConditionalGeneration)
+        (BartConfig, TFBartForConditionalGeneration),
     ]
 )
 
