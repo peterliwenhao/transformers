@@ -695,7 +695,7 @@ class MobileBertPreTrainedModel(PreTrainedModel):
 @dataclass
 class MobileBertForPreTrainingOutput(ModelOutput):
     """
-    Output type of :class:`~transformers.MobileBertForPreTrainingModel`.
+    Output type of :class:`~transformers.MobileBertForPreTraining`.
 
     Args:
         loss (`optional`, returned when ``labels`` is provided, ``torch.FloatTensor`` of shape :obj:`(1,)`):
@@ -887,7 +887,7 @@ class MobileBertModel(MobileBertPreTrainedModel):
         )
 
         # If a 2D ou 3D attention mask is provided for the cross-attention
-        # we need to make broadcastabe to [batch_size, num_heads, seq_length, seq_length]
+        # we need to make broadcastable to [batch_size, num_heads, seq_length, seq_length]
         if self.config.is_decoder and encoder_hidden_states is not None:
             encoder_batch_size, encoder_sequence_length, _ = encoder_hidden_states.size()
             encoder_hidden_shape = (encoder_batch_size, encoder_sequence_length)

@@ -88,8 +88,8 @@ def is_pipeline_test(test_case):
     """
     Decorator marking a test as a pipeline test.
 
-    Pipeline tests are skipped by default and we can run only them by setting RUN_PIPELINE_TEST environment variable to
-    a truthy value and selecting the is_pipeline_test pytest mark.
+    Pipeline tests are skipped by default and we can run only them by setting RUN_PIPELINE_TESTS environment variable
+    to a truthy value and selecting the is_pipeline_test pytest mark.
 
     """
     if not _run_pipeline_tests:
@@ -295,6 +295,22 @@ def require_ray(test_case):
         return unittest.skip("test requires Ray/tune")(test_case)
     else:
         return test_case
+
+
+def get_gpu_count():
+    """
+    Return the number of available gpus (regardless of whether torch or tf is used)
+    """
+    if _torch_available:
+        import torch
+
+        return torch.cuda.device_count()
+    elif _tf_available:
+        import tensorflow as tf
+
+        return len(tf.config.list_physical_devices("GPU"))
+    else:
+        return 0
 
 
 def get_tests_dir(append_path=None):
@@ -695,6 +711,31 @@ def mockenv(**kwargs):
     return unittest.mock.patch.dict(os.environ, kwargs)
 
 
+# --- pytest conf functions --- #
+
+# to avoid multiple invocation from tests/conftest.py and examples/conftest.py - make sure it's called only once
+pytest_opt_registered = {}
+
+
+def pytest_addoption_shared(parser):
+    """
+    This function is to be called from `conftest.py` via `pytest_addoption` wrapper that has to be defined there.
+
+    It allows loading both `conftest.py` files at once without causing a failure due to adding the same `pytest`
+    option.
+
+    """
+    option = "--make-reports"
+    if option not in pytest_opt_registered:
+        parser.addoption(
+            option,
+            action="store",
+            default=False,
+            help="generate report files. The value of this option is used as a prefix to report names",
+        )
+        pytest_opt_registered[option] = 1
+
+
 def pytest_terminal_summary_main(tr, id):
     """
     Generate multiple reports at the end of test suite run - each report goes into a dedicated file in the current
@@ -725,18 +766,22 @@ def pytest_terminal_summary_main(tr, id):
     orig_tbstyle = config.option.tbstyle
     orig_reportchars = tr.reportchars
 
-    report_files = dict(
-        durations="durations",
-        short_summary="short_summary",
-        summary_errors="errors",
-        summary_failures="failures",
-        summary_warnings="warnings",
-        summary_passes="passes",
-        summary_stats="stats",
-    )
     dir = "reports"
     Path(dir).mkdir(parents=True, exist_ok=True)
-    report_files.update((k, f"{dir}/report_{id}_{v}.txt") for k, v in report_files.items())
+    report_files = {
+        k: f"{dir}/{id}_{k}.txt"
+        for k in [
+            "durations",
+            "errors",
+            "failures_long",
+            "failures_short",
+            "failures_line",
+            "passes",
+            "stats",
+            "summary_short",
+            "warnings",
+        ]
+    }
 
     # custom durations report
     # note: there is no need to call pytest --durations=XX to get this separate report
@@ -757,34 +802,60 @@ def pytest_terminal_summary_main(tr, id):
                     break
                 f.write(f"{rep.duration:02.2f}s {rep.when:<8} {rep.nodeid}\n")
 
+    def summary_failures_short(tr):
+        # expecting that the reports were --tb=long (default) so we chop them off here to the last frame
+        reports = tr.getreports("failed")
+        if not reports:
+            return
+        tr.write_sep("=", "FAILURES SHORT STACK")
+        for rep in reports:
+            msg = tr._getfailureheadline(rep)
+            tr.write_sep("_", msg, red=True, bold=True)
+            # chop off the optional leading extra frames, leaving only the last one
+            longrepr = re.sub(r".*_ _ _ (_ ){10,}_ _ ", "", rep.longreprtext, 0, re.M | re.S)
+            tr._tw.line(longrepr)
+            # note: not printing out any rep.sections to keep the report short
+
     # use ready-made report funcs, we are just hijacking the filehandle to log to a dedicated file each
     # adapted from https://github.com/pytest-dev/pytest/blob/897f151e/src/_pytest/terminal.py#L814
     # note: some pytest plugins may interfere by hijacking the default `terminalreporter` (e.g.
     # pytest-instafail does that)
-    tr.reportchars = "wPpsxXEf"  # emulate -rA (used in summary_passes() and short_test_summary())
-    config.option.tbstyle = "auto"
-    with open(report_files["summary_failures"], "w") as f:
+
+    # report failures with line/short/long styles
+    config.option.tbstyle = "auto"  # full tb
+    with open(report_files["failures_long"], "w") as f:
         tr._tw = create_terminal_writer(config, f)
         tr.summary_failures()
 
-    with open(report_files["summary_errors"], "w") as f:
+    # config.option.tbstyle = "short" # short tb
+    with open(report_files["failures_short"], "w") as f:
+        tr._tw = create_terminal_writer(config, f)
+        summary_failures_short(tr)
+
+    config.option.tbstyle = "line"  # one line per error
+    with open(report_files["failures_line"], "w") as f:
+        tr._tw = create_terminal_writer(config, f)
+        tr.summary_failures()
+
+    with open(report_files["errors"], "w") as f:
         tr._tw = create_terminal_writer(config, f)
         tr.summary_errors()
 
-    with open(report_files["summary_warnings"], "w") as f:
+    with open(report_files["warnings"], "w") as f:
         tr._tw = create_terminal_writer(config, f)
         tr.summary_warnings()  # normal warnings
         tr.summary_warnings()  # final warnings
 
-    with open(report_files["summary_passes"], "w") as f:
+    tr.reportchars = "wPpsxXEf"  # emulate -rA (used in summary_passes() and short_test_summary())
+    with open(report_files["passes"], "w") as f:
         tr._tw = create_terminal_writer(config, f)
         tr.summary_passes()
 
-    with open(report_files["short_summary"], "w") as f:
+    with open(report_files["summary_short"], "w") as f:
         tr._tw = create_terminal_writer(config, f)
         tr.short_test_summary()
 
-    with open(report_files["summary_stats"], "w") as f:
+    with open(report_files["stats"], "w") as f:
         tr._tw = create_terminal_writer(config, f)
         tr.summary_stats()
 
@@ -794,7 +865,7 @@ def pytest_terminal_summary_main(tr, id):
     config.option.tbstyle = orig_tbstyle
 
 
-# the following code deals with async io between processes
+# --- distributed testing functions --- #
 
 # adapted from https://stackoverflow.com/a/59041913/9201239
 import asyncio  # noqa
@@ -849,7 +920,7 @@ async def _stream_subprocess(cmd, env=None, stdin=None, timeout=None, quiet=Fals
     # XXX: the timeout doesn't seem to make any difference here
     await asyncio.wait(
         [
-            _read_stream(p.stdout, lambda l: tee(l, out, sys.stdout)),
+            _read_stream(p.stdout, lambda l: tee(l, out, sys.stdout, label="stdout:")),
             _read_stream(p.stderr, lambda l: tee(l, err, sys.stderr, label="stderr:")),
         ],
         timeout=timeout,
@@ -866,10 +937,15 @@ def execute_subprocess_async(cmd, env=None, stdin=None, timeout=180, quiet=False
 
     cmd_str = " ".join(cmd)
     if result.returncode > 0:
+        stderr = "\n".join(result.stderr)
         raise RuntimeError(
-            f"'{cmd_str}' failed with returncode {result.returncode} - see the `stderr:` messages from above for details."
+            f"'{cmd_str}' failed with returncode {result.returncode}\n\n"
+            f"The combined stderr from workers follows:\n{stderr}"
         )
-    if not result.stdout:
+
+    # check that the subprocess actually did run and produced some output, should the test rely on
+    # the remote side to do the testing
+    if not result.stdout and not result.stderr:
         raise RuntimeError(f"'{cmd_str}' produced no output.")
 
     return result

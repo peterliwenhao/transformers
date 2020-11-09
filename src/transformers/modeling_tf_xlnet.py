@@ -652,7 +652,7 @@ class TFXLNetMainLayer(tf.keras.layers.Layer):
         # data mask: input mask & perm mask
         assert input_mask is None or attention_mask is None, (
             "You can only use one of input_mask (uses 1 for padding) "
-            "or attention_mask (uses 0 for padding, added for compatbility with BERT). Please choose one."
+            "or attention_mask (uses 0 for padding, added for compatibility with BERT). Please choose one."
         )
         if input_mask is None and attention_mask is not None:
             input_mask = 1.0 - tf.cast(attention_mask, dtype=dtype_float)
@@ -1122,7 +1122,7 @@ XLNET_INPUTS_DOCSTRING = r"""
 
 
 @add_start_docstrings(
-    "The bare XLNet Model transformer outputing raw hidden-states without any specific head on top.",
+    "The bare XLNet Model transformer outputting raw hidden-states without any specific head on top.",
     XLNET_START_DOCSTRING,
 )
 class TFXLNetModel(TFXLNetPreTrainedModel):
@@ -1257,17 +1257,17 @@ class TFXLNetLMHeadModel(TFXLNetPreTrainedModel, TFCausalLanguageModelingLoss):
 
         transformer_outputs = self.transformer(
             inputs,
-            attention_mask=None,
-            mems=None,
-            perm_mask=None,
-            target_mapping=None,
-            token_type_ids=None,
-            input_mask=None,
-            head_mask=None,
-            inputs_embeds=None,
-            use_cache=True,
-            output_attentions=None,
-            output_hidden_states=None,
+            attention_mask=attention_mask,
+            mems=mems,
+            perm_mask=perm_mask,
+            target_mapping=target_mapping,
+            token_type_ids=token_type_ids,
+            input_mask=input_mask,
+            head_mask=head_mask,
+            inputs_embeds=inputs_embeds,
+            use_cache=use_cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
             return_dict=return_dict,
             training=training,
         )

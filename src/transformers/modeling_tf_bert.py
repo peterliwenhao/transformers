@@ -666,7 +666,7 @@ class TFBertPreTrainedModel(TFPreTrainedModel):
 @dataclass
 class TFBertForPreTrainingOutput(ModelOutput):
     """
-    Output type of :class:`~transformers.TFBertForPreTrainingModel`.
+    Output type of :class:`~transformers.TFBertForPreTraining`.
 
     Args:
         prediction_logits (:obj:`tf.Tensor` of shape :obj:`(batch_size, sequence_length, config.vocab_size)`):
@@ -784,7 +784,7 @@ BERT_INPUTS_DOCSTRING = r"""
 
 
 @add_start_docstrings(
-    "The bare Bert Model transformer outputing raw hidden-states without any specific head on top.",
+    "The bare Bert Model transformer outputting raw hidden-states without any specific head on top.",
     BERT_START_DOCSTRING,
 )
 class TFBertModel(TFBertPreTrainedModel):

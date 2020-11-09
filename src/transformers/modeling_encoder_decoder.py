@@ -30,7 +30,7 @@ logger = logging.get_logger(__name__)
 _CONFIG_FOR_DOC = "EncoderDecoderConfig"
 
 ENCODER_DECODER_START_DOCSTRING = r"""
-    This class can be used to inialize a sequence-to-sequnece model with any pretrained autoencoding model as the
+    This class can be used to initialize a sequence-tsequencece model with any pretrained autoencoding model as the
     encoder and any pretrained autoregressive model as the decoder. The encoder is loaded via
     :meth:`~transformers.AutoModel.from_pretrained` function and the decoder is loaded via
     :meth:`~transformers.AutoModelForCausalLM.from_pretrained` function. Cross-attention layers are automatically added
@@ -426,12 +426,13 @@ class EncoderDecoderModel(PreTrainedModel):
             past_key_values=None,  # TODO(PVP) - need to implement cache for BERT, etc... before this works
             decoder_hidden_states=decoder_outputs.hidden_states,
             decoder_attentions=decoder_outputs.attentions,
+            cross_attentions=decoder_outputs.cross_attentions,
             encoder_last_hidden_state=encoder_outputs.last_hidden_state,
             encoder_hidden_states=encoder_outputs.hidden_states,
             encoder_attentions=encoder_outputs.attentions,
         )
 
-    def prepare_inputs_for_generation(self, input_ids, past, attention_mask, encoder_outputs, **kwargs):
+    def prepare_inputs_for_generation(self, input_ids, past=None, attention_mask=None, encoder_outputs=None, **kwargs):
         decoder_inputs = self.decoder.prepare_inputs_for_generation(input_ids)
         decoder_attention_mask = decoder_inputs["attention_mask"] if "attention_mask" in decoder_inputs else None
         input_dict = {
